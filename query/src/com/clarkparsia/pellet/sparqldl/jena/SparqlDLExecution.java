@@ -60,341 +60,344 @@ import com.hp.hpl.jena.util.FileManager;
  * <p>
  * Company: Clark & Parsia, LLC. <http://www.clarkparsia.com>
  * </p>
- * 
+ *
  * @author Evren Sirin
  */
 class SparqlDLExecution implements QueryExecution {
-	public static Logger log = Logger.getLogger(SparqlDLExecution.class.getName());
+  public static Logger log = Logger.getLogger(SparqlDLExecution.class.getName());
 
-	private static enum QueryType {
-		ASK, CONSTRUCT, DESCRIBE, SELECT
-	}
+  private static enum QueryType {
+    ASK, CONSTRUCT, DESCRIBE, SELECT
+  }
 
-	private Query query;
+  private boolean closed = false;
 
-	private Dataset source;
+  private Query query;
 
-	private QuerySolution initialBinding;
+  private Dataset source;
 
-	private boolean purePelletQueryExec = false;
+  private QuerySolution initialBinding;
 
-	private boolean handleVariableSPO = true;
+  private boolean purePelletQueryExec = false;
 
-	public SparqlDLExecution(String query, Model source) {
-		this(QueryFactory.create(query), source);
-	}
+  private boolean handleVariableSPO = true;
 
-	public SparqlDLExecution(Query query, Model source) {
-		this(query, DatasetFactory.create(source));
-	}
+  public SparqlDLExecution(String query, Model source) {
+    this(QueryFactory.create(query), source);
+  }
 
-	public SparqlDLExecution(Query query, Dataset source) {
-		this(query, source, true);
-	}
+  public SparqlDLExecution(Query query, Model source) {
+    this(query, DatasetFactory.create(source));
+  }
 
-	public SparqlDLExecution(Query query, Dataset source, boolean handleVariableSPO) {
-		this.query = query;
-		this.source = source;
-		this.handleVariableSPO = handleVariableSPO;
+  public SparqlDLExecution(Query query, Dataset source) {
+    this(query, source, true);
+  }
 
-		Graph graph = source.getDefaultModel().getGraph();
-		if (!(graph instanceof PelletInfGraph))
-			throw new QueryException("PelletQueryExecution can only be used with Pellet-backed models");
+  public SparqlDLExecution(Query query, Dataset source, boolean handleVariableSPO) {
+    this.query = query;
+    this.source = source;
+    this.handleVariableSPO = handleVariableSPO;
 
-		if (PelletOptions.FULL_SIZE_ESTIMATE)
-			((PelletInfGraph) graph).getKB().getSizeEstimate().computeAll();
-	}
+    Graph graph = source.getDefaultModel().getGraph();
+    if (!(graph instanceof PelletInfGraph))
+      throw new QueryException("PelletQueryExecution can only be used with Pellet-backed models");
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public Model execDescribe() {
-		throw new UnsupportedOperationException("Not supported yet!");
-	}
+    if (PelletOptions.FULL_SIZE_ESTIMATE)
+      ((PelletInfGraph) graph).getKB().getSizeEstimate().computeAll();
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public Model execDescribe(Model model) {
-		throw new UnsupportedOperationException("Not supported yet!");
-	}
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Model execDescribe() {
+    throw new UnsupportedOperationException("Not supported yet!");
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public Model execConstruct() {
-		Model model = ModelFactory.createDefaultModel();
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Model execDescribe(Model model) {
+    throw new UnsupportedOperationException("Not supported yet!");
+  }
 
-		execConstruct(model);
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Model execConstruct() {
+    Model model = ModelFactory.createDefaultModel();
 
-		return model;
-	}
+    execConstruct(model);
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@SuppressWarnings("unchecked")
-	@Override
-	public Model execConstruct(Model model) {
-		ensureQueryType(QueryType.CONSTRUCT);
+    return model;
+  }
 
-		ResultSet results = exec();
+  /**
+   * {@inheritDoc}
+   */
+  @SuppressWarnings("unchecked")
+  @Override
+  public Model execConstruct(Model model) {
+    ensureQueryType(QueryType.CONSTRUCT);
 
-		if (results == null) {
-			QueryExecutionFactory.create(query, source, initialBinding).execConstruct(model);
-		}
-		else {
-			model.setNsPrefixes(source.getDefaultModel());
-			model.setNsPrefixes(query.getPrefixMapping());
+    ResultSet results = exec();
 
-			Set set = new HashSet();
+    if (results == null) {
+      QueryExecutionFactory.create(query, source, initialBinding).execConstruct(model);
+    }
+    else {
+      model.setNsPrefixes(source.getDefaultModel());
+      model.setNsPrefixes(query.getPrefixMapping());
 
-			Template template = query.getConstructTemplate();
+      Set set = new HashSet();
 
-			while (results.hasNext()) {
-				Map bNodeMap = new HashMap();
-				Binding binding = results.nextBinding();
-				template.subst(set, bNodeMap, binding);
-			}
+      Template template = query.getConstructTemplate();
 
-			for (Iterator iter = set.iterator(); iter.hasNext();) {
-				Triple t = (Triple) iter.next();
-				Statement stmt = ModelUtils.tripleToStatement(model, t);
-				if (stmt != null)
-					model.add(stmt);
-			}
+      while (results.hasNext()) {
+        Map bNodeMap = new HashMap();
+        Binding binding = results.nextBinding();
+        template.subst(set, bNodeMap, binding);
+      }
 
-			close();
-		}
+      for (Iterator iter = set.iterator(); iter.hasNext();) {
+        Triple t = (Triple) iter.next();
+        Statement stmt = ModelUtils.tripleToStatement(model, t);
+        if (stmt != null)
+          model.add(stmt);
+      }
 
-		return model;
-	}
+      close();
+    }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public boolean execAsk() {
-		ensureQueryType(QueryType.ASK);
+    return model;
+  }
 
-		ResultSet results = exec();
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public boolean execAsk() {
+    ensureQueryType(QueryType.ASK);
 
-		return (results != null) ? results.hasNext() : QueryExecutionFactory.create(query, source, initialBinding)
-		                .execAsk();
-	}
+    ResultSet results = exec();
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public ResultSet execSelect() {
-		ensureQueryType(QueryType.SELECT);
+    return (results != null) ? results.hasNext() : QueryExecutionFactory.create(query, source, initialBinding)
+                    .execAsk();
+  }
 
-		ResultSet results = exec();
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public ResultSet execSelect() {
+    ensureQueryType(QueryType.SELECT);
 
-		return (results != null) ? results : QueryExecutionFactory.create(query, source, initialBinding).execSelect();
+    ResultSet results = exec();
 
-	}
+    return (results != null) ? results : QueryExecutionFactory.create(query, source, initialBinding).execSelect();
 
-	/**
-	 * Returns the results of the given query using Pellet SPARQL-DL query engine or <code>null</code> if the query is
-	 * not a valid SPARQL-DL query.
-	 * 
-	 * @return the query results or <code>null</code> for unsupported queried
-	 */
-	private ResultSet exec() {
-		try {
-			if (source.listNames().hasNext())
-				throw new UnsupportedQueryException("Named graphs is not supported by Pellet");
+  }
 
-			PelletInfGraph pelletInfGraph = (PelletInfGraph) source.getDefaultModel().getGraph();
-			KnowledgeBase kb = pelletInfGraph.getKB();
+  /**
+   * Returns the results of the given query using Pellet SPARQL-DL query engine or <code>null</code> if the query is
+   * not a valid SPARQL-DL query.
+   *
+   * @return the query results or <code>null</code> for unsupported queried
+   */
+  private ResultSet exec() {
+    try {
+      if (source.listNames().hasNext())
+        throw new UnsupportedQueryException("Named graphs is not supported by Pellet");
 
-			pelletInfGraph.prepare();
+      PelletInfGraph pelletInfGraph = (PelletInfGraph) source.getDefaultModel().getGraph();
+      KnowledgeBase kb = pelletInfGraph.getKB();
 
-			QueryParameters queryParameters = new QueryParameters(initialBinding);
+      pelletInfGraph.prepare();
 
-			ARQParser parser = new ARQParser(handleVariableSPO);
-			// The parser uses the query parameterization to resolve parameters
-			// (i.e. variables) in the query
-			parser.setInitialBinding(initialBinding);
+      QueryParameters queryParameters = new QueryParameters(initialBinding);
 
-			com.clarkparsia.pellet.sparqldl.model.Query q = parser.parse(query, kb);
-			// The query uses the query parameterization to resolve bindings
-			// (i.e. for instance if the parameter variable is in query
-			// projection, we need to add the initial binding to the resulting
-			// bindings manually)
-			q.setQueryParameters(queryParameters);
+      ARQParser parser = new ARQParser(handleVariableSPO);
+      // The parser uses the query parameterization to resolve parameters
+      // (i.e. variables) in the query
+      parser.setInitialBinding(initialBinding);
 
-			ResultSet results = new SparqlDLResultSet(com.clarkparsia.pellet.sparqldl.engine.QueryEngine.exec(q),
-			                source.getDefaultModel(), queryParameters);
+      com.clarkparsia.pellet.sparqldl.model.Query q = parser.parse(query, kb);
+      // The query uses the query parameterization to resolve bindings
+      // (i.e. for instance if the parameter variable is in query
+      // projection, we need to add the initial binding to the resulting
+      // bindings manually)
+      q.setQueryParameters(queryParameters);
 
-			List<SortCondition> sortConditions = query.getOrderBy();
-			if (sortConditions != null && !sortConditions.isEmpty()) {
-				results = new SortedResultSet(results, sortConditions);
-			}
+      ResultSet results = new SparqlDLResultSet(com.clarkparsia.pellet.sparqldl.engine.QueryEngine.exec(q),
+                      source.getDefaultModel(), queryParameters);
 
-			if (query.hasOffset() || query.hasLimit()) {
-				long offset = query.hasOffset() ? query.getOffset() : 0;
-				long limit = query.hasLimit() ? query.getLimit() : Long.MAX_VALUE;
-				results = new SlicedResultSet(results, offset, limit);
-			}
+      List<SortCondition> sortConditions = query.getOrderBy();
+      if (sortConditions != null && !sortConditions.isEmpty()) {
+        results = new SortedResultSet(results, sortConditions);
+      }
 
-			return results;
-		}
-		catch (UnsupportedQueryException e) {
-			log.log(purePelletQueryExec ? Level.INFO : Level.FINE, "This is not a SPARQL-DL query: " + e.getMessage());
+      if (query.hasOffset() || query.hasLimit()) {
+        long offset = query.hasOffset() ? query.getOffset() : 0;
+        long limit = query.hasLimit() ? query.getLimit() : Long.MAX_VALUE;
+        results = new SlicedResultSet(results, offset, limit);
+      }
 
-			if (purePelletQueryExec) {
-				throw e;
-			}
-			else {
-				log.fine("Falling back to Jena query engine");
-				return null;
-			}
-		}
-	}
+      return results;
+    }
+    catch (UnsupportedQueryException e) {
+      log.log(purePelletQueryExec ? Level.INFO : Level.FINE, "This is not a SPARQL-DL query: " + e.getMessage());
 
-	@Override
-	public void abort() {
-		throw new UnsupportedOperationException("Not supported yet!");
-	}
+      if (purePelletQueryExec) {
+        throw e;
+      }
+      else {
+        log.fine("Falling back to Jena query engine");
+        return null;
+      }
+    }
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void close() {
-		log.fine("Closing PelletQueryExecution '" + hashCode() + "'.");
-	}
+  @Override
+  public void abort() {
+    throw new UnsupportedOperationException("Not supported yet!");
+  }
 
-	@Override
-	public void setFileManager(FileManager manager) {
-		throw new UnsupportedOperationException("Not supported yet!");
-	}
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void close() {
+    closed = true;
+    log.fine("Closing PelletQueryExecution '" + hashCode() + "'.");
+  }
 
-	@Override
-	public void setInitialBinding(QuerySolution startSolution) {
-		initialBinding = startSolution;
-	}
+  @Override
+  public void setInitialBinding(QuerySolution startSolution) {
+    initialBinding = startSolution;
+  }
 
-	@Override
-	public Context getContext() {
-		throw new UnsupportedOperationException("Not supported yet!");
-	}
+  @Override
+  public Context getContext() {
+    throw new UnsupportedOperationException("Not supported yet!");
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public Dataset getDataset() {
-		throw new UnsupportedOperationException("Not supported yet!");
-		// return source;
-	}
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Dataset getDataset() {
+    throw new UnsupportedOperationException("Not supported yet!");
+    // return source;
+  }
 
-	private void ensureQueryType(QueryType expectedType) throws QueryExecException {
-		QueryType actualType = getQueryType(query);
-		if (actualType != expectedType)
-			throw new QueryExecException("Attempt to execute a " + actualType + " query as a " + expectedType
-			                + " query");
-	}
+  private void ensureQueryType(QueryType expectedType) throws QueryExecException {
+    QueryType actualType = getQueryType(query);
+    if (actualType != expectedType)
+      throw new QueryExecException("Attempt to execute a " + actualType + " query as a " + expectedType
+                      + " query");
+  }
 
-	private static QueryType getQueryType(Query query) {
-		if (query.isSelectType())
-			return QueryType.SELECT;
-		if (query.isConstructType())
-			return QueryType.CONSTRUCT;
-		if (query.isDescribeType())
-			return QueryType.DESCRIBE;
-		if (query.isAskType())
-			return QueryType.ASK;
-		return null;
-	}
+  private static QueryType getQueryType(Query query) {
+    if (query.isSelectType())
+      return QueryType.SELECT;
+    if (query.isConstructType())
+      return QueryType.CONSTRUCT;
+    if (query.isDescribeType())
+      return QueryType.DESCRIBE;
+    if (query.isAskType())
+      return QueryType.ASK;
+    return null;
+  }
 
-	public boolean isPurePelletQueryExec() {
-		return purePelletQueryExec;
-	}
+  public boolean isPurePelletQueryExec() {
+    return purePelletQueryExec;
+  }
 
-	public void setPurePelletQueryExec(boolean purePelletQueryExec) {
-		this.purePelletQueryExec = purePelletQueryExec;
-	}
+  public void setPurePelletQueryExec(boolean purePelletQueryExec) {
+    this.purePelletQueryExec = purePelletQueryExec;
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public Iterator<Triple> execConstructTriples() {
-		return ModelUtils.statementsToTriples(execConstruct().listStatements());
-	}
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Iterator<Triple> execConstructTriples() {
+    return ModelUtils.statementsToTriples(execConstruct().listStatements());
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public Iterator<Triple> execDescribeTriples() {
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Iterator<Triple> execDescribeTriples() {
         return ModelUtils.statementsToTriples(execDescribe().listStatements());
-	}
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public Query getQuery() {
-		return query;
-	}
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Query getQuery() {
+    return query;
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public long getTimeout1() {
-		// not supported yet
-		return -1;
-	}
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public long getTimeout1() {
+    // not supported yet
+    return -1;
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public long getTimeout2() {
-		// not supported yet
-		return -1;
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public long getTimeout2() {
+    // not supported yet
+    return -1;
 
-	}
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void setTimeout(long arg0) {
-		// not supported yet
-	}
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void setTimeout(long arg0) {
+    // not supported yet
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
+  /**
+   * {@inheritDoc}
+   */
 
-	@Override
-	public void setTimeout(long arg0, TimeUnit arg1) {
-		// not supported yet
-	}
+  @Override
+  public void setTimeout(long arg0, TimeUnit arg1) {
+    // not supported yet
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void setTimeout(long arg0, long arg1) {
-		// not supported yet
-	}
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void setTimeout(long arg0, long arg1) {
+    // not supported yet
+  }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void setTimeout(long arg0, TimeUnit arg1, long arg2, TimeUnit arg3) {
-		// not supported yet
-	}
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void setTimeout(long arg0, TimeUnit arg1, long arg2, TimeUnit arg3) {
+    // not supported yet
+  }
+
+  @Override
+  public boolean isClosed() {
+    return closed;
+  }
 }

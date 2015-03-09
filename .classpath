@@ -22,10 +22,6 @@
 	<classpathentry kind="lib" path="jena/lib/jena/httpclient-4.2.3.jar"/>
 	<classpathentry kind="lib" path="jena/lib/jena/httpcore-4.2.2.jar"/>
 	<classpathentry kind="lib" path="jena/lib/jena/jcl-over-slf4j-1.6.4.jar"/>
-	<classpathentry kind="lib" path="jena/lib/jena/jena-arq-2.10.1.jar"/>
-	<classpathentry kind="lib" path="jena/lib/jena/jena-core-2.10.1.jar"/>
-	<classpathentry kind="lib" path="jena/lib/jena/jena-iri-0.9.6.jar"/>
-	<classpathentry kind="lib" path="jena/lib/jena/jena-tdb-0.10.1.jar"/>
 	<classpathentry kind="lib" path="jena/lib/jena/log4j-1.2.16.jar"/>
 	<classpathentry kind="lib" path="jena/lib/jena/slf4j-api-1.6.4.jar"/>
 	<classpathentry kind="lib" path="jena/lib/jena/slf4j-log4j12-1.6.4.jar"/>
@@ -40,5 +36,9 @@
 	<classpathentry kind="lib" path="profiler/lib/jfreechart/jfreechart-1.0.13.jar"/>
 	<classpathentry kind="lib" path="test/lib/junit/junit.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="jena/lib/jena/jena-arq-2.12.0.jar"/>
+	<classpathentry kind="lib" path="jena/lib/jena/jena-core-2.12.0.jar"/>
+	<classpathentry kind="lib" path="jena/lib/jena/jena-iri-1.0.2.jar"/>
+	<classpathentry kind="lib" path="jena/lib/jena/jena-tdb-1.1.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
