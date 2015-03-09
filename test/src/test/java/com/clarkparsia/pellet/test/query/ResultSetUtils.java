@@ -92,9 +92,7 @@ public class ResultSetUtils {
 		if (log.isLoggable(Level.WARNING)) {
 			log.warning(name + " (" + results.size() + ")");
 			results.reset();
-			ByteArrayOutputStream out = new ByteArrayOutputStream();
-			ResultSetFormatter.output(out, results, ResultsFormat.FMT_TEXT);
-			log.warning("\n" + out.toString());
+			log.warning("\n" + ResultSetFormatter.asText( results ));
 		}
 	}
 }
