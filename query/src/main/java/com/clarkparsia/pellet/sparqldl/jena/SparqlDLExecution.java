@@ -60,7 +60,7 @@ import com.hp.hpl.jena.util.FileManager;
  * <p>
  * Company: Clark & Parsia, LLC. <http://www.clarkparsia.com>
  * </p>
- * 
+ *
  * @author Evren Sirin
  */
 class SparqlDLExecution implements QueryExecution {
@@ -69,6 +69,8 @@ class SparqlDLExecution implements QueryExecution {
 	private static enum QueryType {
 		ASK, CONSTRUCT, DESCRIBE, SELECT
 	}
+
+	private boolean closed = false;
 
 	private Query query;
 
@@ -183,7 +185,7 @@ class SparqlDLExecution implements QueryExecution {
 		ResultSet results = exec();
 
 		return (results != null) ? results.hasNext() : QueryExecutionFactory.create(query, source, initialBinding)
-		                .execAsk();
+										.execAsk();
 	}
 
 	/**
@@ -202,7 +204,7 @@ class SparqlDLExecution implements QueryExecution {
 	/**
 	 * Returns the results of the given query using Pellet SPARQL-DL query engine or <code>null</code> if the query is
 	 * not a valid SPARQL-DL query.
-	 * 
+	 *
 	 * @return the query results or <code>null</code> for unsupported queried
 	 */
 	private ResultSet exec() {
@@ -230,7 +232,7 @@ class SparqlDLExecution implements QueryExecution {
 			q.setQueryParameters(queryParameters);
 
 			ResultSet results = new SparqlDLResultSet(com.clarkparsia.pellet.sparqldl.engine.QueryEngine.exec(q),
-			                source.getDefaultModel(), queryParameters);
+											source.getDefaultModel(), queryParameters);
 
 			List<SortCondition> sortConditions = query.getOrderBy();
 			if (sortConditions != null && !sortConditions.isEmpty()) {
@@ -268,12 +270,8 @@ class SparqlDLExecution implements QueryExecution {
 	 */
 	@Override
 	public void close() {
+		closed = true;
 		log.fine("Closing PelletQueryExecution '" + hashCode() + "'.");
-	}
-
-	@Override
-	public void setFileManager(FileManager manager) {
-		throw new UnsupportedOperationException("Not supported yet!");
 	}
 
 	@Override
@@ -299,7 +297,7 @@ class SparqlDLExecution implements QueryExecution {
 		QueryType actualType = getQueryType(query);
 		if (actualType != expectedType)
 			throw new QueryExecException("Attempt to execute a " + actualType + " query as a " + expectedType
-			                + " query");
+											+ " query");
 	}
 
 	private static QueryType getQueryType(Query query) {
@@ -335,7 +333,7 @@ class SparqlDLExecution implements QueryExecution {
 	 */
 	@Override
 	public Iterator<Triple> execDescribeTriples() {
-        return ModelUtils.statementsToTriples(execDescribe().listStatements());
+				return ModelUtils.statementsToTriples(execDescribe().listStatements());
 	}
 
 	/**
@@ -396,5 +394,10 @@ class SparqlDLExecution implements QueryExecution {
 	@Override
 	public void setTimeout(long arg0, TimeUnit arg1, long arg2, TimeUnit arg3) {
 		// not supported yet
+	}
+
+	@Override
+	public boolean isClosed() {
+		return closed;
 	}
 }
