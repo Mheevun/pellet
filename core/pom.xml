@@ -13,6 +13,7 @@
 		<dependency>
 			<groupId>com.github.ansell.aterms</groupId>
 			<artifactId>aterm-java</artifactId>
+			<version>1.8.2-p1</version>
 		</dependency>
 		<dependency>
 			<groupId>org.jgrapht</groupId>
